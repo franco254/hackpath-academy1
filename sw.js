@@ -1,106 +1,53 @@
-// HackPath Academy — Service Worker
-// Caches the entire app for offline use
+// HackPath Academy — Service Worker v2
+// Single-file app: cache everything on first visit
 
-const CACHE_NAME = 'hackpath-v1';
-const OFFLINE_URL = '/hackpath-academy/index.html';
+const CACHE = 'hackpath-v2';
 
-// All assets to pre-cache on install
-const PRECACHE_ASSETS = [
-  '/hackpath-academy/',
-  '/hackpath-academy/index.html',
-  // External fonts & libraries — cache on first fetch
-];
-
-// External origins to cache (CDN assets)
-const CACHE_ORIGINS = [
-  'fonts.googleapis.com',
-  'fonts.gstatic.com',
-  'cdn.jsdelivr.net',
-];
-
-// ── INSTALL: pre-cache the app shell ──
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      console.log('[SW] Pre-caching app shell');
-      return cache.addAll(PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW] Pre-cache failed (expected on first deploy):', err);
-      });
-    })
-  );
+// On install — skip waiting, take over immediately
+self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
-// ── ACTIVATE: clean up old caches ──
-self.addEventListener('activate', event => {
-  event.waitUntil(
+self.addEventListener('activate', e => {
+  // Delete any old caches
+  e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(k => k !== CACHE_NAME)
-          .map(k => {
-            console.log('[SW] Deleting old cache:', k);
-            return caches.delete(k);
-          })
-      )
-    )
-  );
-  self.clients.claim();
-});
-
-// ── FETCH: cache-first for app, network-first for APIs ──
-self.addEventListener('fetch', event => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Skip non-GET requests
-  if (request.method !== 'GET') return;
-
-  // Skip EmailJS API calls — always need network
-  if (url.hostname === 'api.emailjs.com') return;
-
-  // Cache-first strategy for everything else
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) {
-        // Return cache immediately, update in background
-        fetchAndCache(request);
-        return cached;
-      }
-
-      // Not in cache — fetch from network and store
-      return fetchAndCache(request);
-    }).catch(() => {
-      // Offline fallback — serve the app shell
-      if (request.destination === 'document') {
-        return caches.match(OFFLINE_URL);
-      }
-    })
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 
-// Fetch from network and add to cache
-function fetchAndCache(request) {
-  return fetch(request).then(response => {
-    // Only cache valid responses
-    if (!response || response.status !== 200 || response.type === 'error') {
-      return response;
-    }
+// Fetch strategy: cache-first, fallback to network, store for later
+self.addEventListener('fetch', e => {
+  const req = e.request;
 
-    // Don't cache opaque responses from non-CORS origins we don't control
-    // Exception: allow CDN fonts and libraries
-    const url = new URL(request.url);
-    const shouldCache =
-      url.origin === self.location.origin ||
-      CACHE_ORIGINS.some(o => url.hostname.includes(o));
+  // Only handle GET
+  if (req.method !== 'GET') return;
 
-    if (shouldCache) {
-      const responseClone = response.clone();
-      caches.open(CACHE_NAME).then(cache => {
-        cache.put(request, responseClone);
-      });
-    }
+  // Never intercept EmailJS API
+  if (req.url.includes('api.emailjs.com')) return;
 
-    return response;
-  });
-}
+  e.respondWith(
+    caches.open(CACHE).then(cache =>
+      cache.match(req).then(cached => {
+        // Fetch from network in parallel to update cache
+        const networkFetch = fetch(req).then(res => {
+          // Cache valid same-origin + CDN responses
+          if (res && res.status === 200) {
+            const url = new URL(req.url);
+            const cacheable =
+              url.hostname === self.location.hostname ||
+              url.hostname.includes('fonts.googleapis.com') ||
+              url.hostname.includes('fonts.gstatic.com') ||
+              url.hostname.includes('cdn.jsdelivr.net');
+            if (cacheable) cache.put(req, res.clone());
+          }
+          return res;
+        }).catch(() => null);
+
+        // Return cached immediately if available, otherwise wait for network
+        return cached || networkFetch;
+      })
+    ).catch(() => caches.match(req)) // last resort: anything in cache
+  );
+});
