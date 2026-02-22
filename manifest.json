@@ -1,0 +1,21 @@
+{
+  "name": "HackPath Academy",
+  "short_name": "HackPath",
+  "description": "Linux Foundations for Ethical Hacking — Interactive course with terminals, quizzes, and a professional certificate.",
+  "start_url": "/hackpath-academy/",
+  "scope": "/hackpath-academy/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0d0f",
+  "theme_color": "#00ff88",
+  "icons": [
+    {
+      "src": "hackpath_icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "utilities"],
+  "lang": "en"
+}
