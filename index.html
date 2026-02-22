@@ -950,7 +950,7 @@ nav{background:rgba(10,13,15,.97);border-bottom:1px solid var(--border);padding:
   </div>
   <div class="nav-links" id="nav-links-main">
     <button class="nb active" onclick="showView('home')">HOME</button>
-    <button class="nb" onclick="showView('lesson')">LESSONS</button>
+    <button class="nb" onclick="requireAuth()">LESSONS</button>
     <button class="nb" onclick="showView('quiz')">FINAL EXAM</button>
     <button class="nb pro" id="nav-cert-btn" onclick="showView('cert')">🏆 CERTIFICATE</button>
   </div>
@@ -1007,7 +1007,7 @@ nav{background:rgba(10,13,15,.97);border-bottom:1px solid var(--border);padding:
       <div class="stat"><div class="sn">6</div><div class="sl">PRO Features</div></div>
     </div>
     <div class="hact">
-      <button class="btn-p" onclick="showView('lesson')">START COURSE →</button>
+      <button class="btn-p" onclick="requireAuth()">START COURSE →</button>
       <button class="btn-s" onclick="showView('cert')" id="home-cert-btn">🏆 VIEW CERTIFICATE</button>
     </div>
   </div>
@@ -3582,6 +3582,15 @@ function save(){
 }
 
 // =================== VIEWS ===================
+function requireAuth() {
+  const cu = getCurrentUser();
+  if (cu) {
+    showView('lesson');
+  } else {
+    showAuth('register');
+  }
+}
+
 function showView(name, pushHistory = true){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
